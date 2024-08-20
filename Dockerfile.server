@@ -1,0 +1,25 @@
+# Use Node.js 20 slim image as the base
+FROM node:22-slim
+
+# Set up pnpm
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+RUN corepack use pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy package.json and pnpm-lock.yaml (if available)
+COPY package.json pnpm-lock.yaml* ./
+
+# Install dependencies
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# Copy application files
+COPY . .
+
+EXPOSE 42069
+
+# Use an argument to specify the start command
+CMD ["pnpm", "serve"]

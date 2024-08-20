@@ -1,27 +1,31 @@
 {
-  "name": "ponder-sse",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "ponder dev",
-    "start": "ponder start",
-    "codegen": "ponder codegen",
-    "lint": "eslint .",
-    "typecheck": "tsc"
-  },
-  "dependencies": {
-    "@ponder/core": "^0.5.16",
-    "hono": "^4.5.0",
-    "viem": "^1.19.3"
-  },
-  "devDependencies": {
-    "@types/node": "^20.9.0",
-    "eslint": "^8.53.0",
-    "eslint-config-ponder": "^0.5.16",
-    "typescript": "^5.2.2"
-  },
-  "engines": {
-    "node": ">=18.14"
-  }
+	"name": "ponder-sse",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "ponder dev",
+		"start": "ponder start",
+		"serve": "ponder serve",
+		"codegen": "ponder codegen",
+		"lint": "eslint .",
+		"typecheck": "tsc"
+	},
+	"dependencies": {
+		"@ponder/core": "^0.5.16",
+		"@types/ioredis": "^5.0.0",
+		"bentocache": "1.0.0-beta.9",
+		"hono": "^4.5.0",
+		"ioredis": "^5.4.1",
+		"viem": "^1.19.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "1.8.3",
+		"@types/node": "^20.9.0",
+		"typescript": "^5.2.2"
+	},
+	"engines": {
+		"node": ">=18.14"
+	},
+	"packageManager": "pnpm@9.7.1"
 }
