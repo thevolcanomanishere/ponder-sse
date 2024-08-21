@@ -40,15 +40,14 @@ services:
       - DATABASE_URL=postgresql://user:password@postgres:5432/mydb
       - REDIS_URL=redis://redis:6379
 
-
   server:
     build:
       context: .
       dockerfile: Dockerfile.server
       args:
         START_COMMAND: serve
-    ports:
-      - "3001:42069"
+    expose:
+      - "42069"
     depends_on:
       redis:
         condition: service_healthy
@@ -57,3 +56,18 @@ services:
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/mydb
       - REDIS_URL=redis://redis:6379
+    deploy:
+      replicas: 3
+
+  loadbalancer:
+    image: haproxy:latest
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - server
+
+volumes:
+  postgres_data:

@@ -1,9 +1,9 @@
 import { ponder } from "@/generated";
-import { Context } from "hono";
 import { type SSEStreamingApi, streamSSE } from "hono/streaming";
 import { getAddress } from "viem";
-import { eq } from "@ponder/core";
+import { and, eq } from "@ponder/core";
 import Redis from "ioredis";
+import { cache, watchCacheSpace } from "../cache";
 
 if (!process.env.REDIS_URL) {
 	throw new Error("REDIS_URL is not set");
@@ -19,13 +19,14 @@ subscribe.on("message", (channel, message) => {
 		from: string;
 		amount: string;
 		time: string;
+		chain: string;
 	};
 	if (channel === "USDC:Transfer") {
 		const streams = allStreams.values();
 
 		for (const stream of streams) {
 			stream.writeSSE({
-				event: channel,
+				event: "allEvents",
 				data: message,
 			});
 		}
@@ -35,7 +36,7 @@ subscribe.on("message", (channel, message) => {
 		const stream = sseStreamers.get(parsed.from) as SSEStreamingApi;
 
 		stream.writeSSE({
-			event: channel,
+			event: "allEvents",
 			data: message,
 		});
 	}
@@ -46,19 +47,22 @@ BigInt.prototype.toJSON = function () {
 	return this.toString();
 };
 
+/**
+ * The collection of individual address streams
+ */
 const sseStreamers = new Map<string, SSEStreamingApi>();
 
-ponder.get("/sse/:from", async (c) => {
-	const from = c.req.param("from");
+ponder.get("/sse/:address", async (c) => {
+	const address = c.req.param("address");
 
-	if (!from) {
-		return c.text("No from param");
+	if (!address) {
+		return c.text("Missing params");
 	}
 
-	const addressValidated = getAddress(from);
+	const addressValidated = getAddress(address);
 
 	if (!addressValidated) {
-		return c.text("Invalid from param");
+		return c.text("Invalid address param");
 	}
 
 	const { Transfer } = c.tables;
@@ -66,8 +70,7 @@ ponder.get("/sse/:from", async (c) => {
 	const transfers = await c.db
 		.select()
 		.from(Transfer)
-		.where(eq(Transfer.from, addressValidated))
-		.limit(10);
+		.where(eq(Transfer.from, addressValidated));
 
 	// @ts-expect-error - context type clashes with the one from the `streamSSE` function
 	return streamSSE(c, async (stream) => {
@@ -85,7 +88,7 @@ ponder.get("/sse/:from", async (c) => {
 		// Send all historical transfers if they exist
 		await stream.writeSSE({
 			data: JSON.stringify(transfers),
-			event: "transfer",
+			event: "USDC:Transfers",
 		});
 
 		// This keeps the connection open until the client closes it
@@ -93,16 +96,16 @@ ponder.get("/sse/:from", async (c) => {
 	});
 });
 
+/**
+ * The collection of connections to users that are streaming all events
+ */
 const allStreams = new Map<string, SSEStreamingApi>();
 
 ponder.get("/allEvents", async (c) => {
-	console.log("All Events FIRED");
 	// @ts-expect-error - context type clashes with the one from the `streamSSE` function
 	return streamSSE(c, async (stream) => {
 		const reqId = crypto.randomUUID();
 		c.req.raw.headers.set("reqId", reqId);
-
-		console.log("RequestId ", reqId);
 
 		stream.onAbort(() => {
 			console.log("Aborted ", reqId);
@@ -115,12 +118,45 @@ ponder.get("/allEvents", async (c) => {
 
 		allStreams.set(reqId, stream);
 
-		await stream.writeSSE({
-			event: "allEvents",
-			data: "Connected",
-		});
-
 		// This keeps the connection open until the client closes it
 		await new Promise(() => {});
 	});
+});
+
+ponder.post("/watchAddress/:address", async (c) => {
+	const address = c.req.param("address");
+
+	if (!address) {
+		return c.text("Missing params");
+	}
+
+	const addressValidated = getAddress(address);
+
+	if (!addressValidated) {
+		return c.text("Invalid address");
+	}
+
+	await watchCacheSpace.set(`${addressValidated}`, true);
+
+	console.log(`Watching ${addressValidated}`);
+
+	return c.text("OK");
+});
+
+ponder.hono.delete("/watchAddress/:address", async (c) => {
+	const address = c.req.param("address");
+
+	if (!address) {
+		return c.text("Missing params");
+	}
+
+	const addressValidated = getAddress(address);
+
+	if (!addressValidated) {
+		return c.text("Invalid address");
+	}
+
+	await watchCacheSpace.delete(`${addressValidated}`);
+
+	return c.text("OK");
 });

@@ -8,9 +8,10 @@ export default createSchema((p) => ({
 			from: p.hex(),
 			amount: p.bigint(),
 			time: p.bigint(),
+			chain: p.string(),
 		},
 		{
-			toIndex: p.index("from"),
+			fromChainIndex: p.index("from"),
 		},
 	),
 }));
